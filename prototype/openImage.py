@@ -44,7 +44,44 @@ class ImageConverter:
 			print '{0},{1}'.format(str(countRGB), str(countD))
 		print "Conversion complete!"
 
+	def writeDepthVideoSequence(self, dirname, depthOrderFile):
+		countD = 0
+		if not isdir(dirname):
+			mkdir(dirname)
+		elif not isdir(dirname+'/depth'):
+			mkdir(dirname+'/depth')
+
+		with open(depthOrderFile, 'r') as f:
+			for line in f:
+				line = line.split('\n')[0]
+				depth = Image.open(self.pathname + line)
+				depth.save('{0}/depth/d{1}.png'.format(dirname, str(countD)))
+				depth.close()
+				countD += 1 
+				print('Writing image ' + str(countD))
+
+		f.close()
+
+
+	def writeRGBVideoSequence(self, dirname, depthOrderFile):
+		countD = 0
+		if not isdir(dirname):
+			mkdir(dirname)
+		elif not isdir(dirname+'/rgb'):
+			mkdir(dirname+'/rgb')
+
+		with open(depthOrderFile, 'r') as f:
+			for line in f:
+				line = line.split('\n')[0]
+				depth = Image.open(self.pathname + line)
+				depth.save('{0}/rgb/rgb{1}.png'.format(dirname, str(countD)))
+				depth.close()
+				countD += 1 
+				print('Writing image ' + str(countD))
+
+		f.close()
+
 if __name__ == '__main__':
 	ic = ImageConverter(sys.argv[1])
-	ic.getFilesInPath()
-	ic.writeFilesAsImages(sys.argv[2])
+	# ic.writeDepthVideoSequence(sys.argv[2], sys.argv[3])
+	ic.writeRGBVideoSequence(sys.argv[2], sys.argv[3])
