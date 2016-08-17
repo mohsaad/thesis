@@ -9,7 +9,7 @@ import sys
 from math import floor
 import time
 
-def gaussian(sigma, value):
+def gaussianI(sigma, value):
 	pass
 
 '''
@@ -22,11 +22,13 @@ def distance(p1, p2):
 Assuming RGB and depth images are the same size, calculate the joint histogram
 '''
 def generate_joint_histogram(rgbImage, depImage, windowSize, sigmaR, sigmaS, sigmaI, nBins):
-	t0 = time.time()
-	histogram = np.zeros(depImage.shape[0], depImage.shape[1], nBins)
-	halfWinSize = floor(windowSize / 2.0)
 	sizeH = rgbImage.shape[0]
 	sizeW = rgbImage.shape[1]
+	t0 = time.time()
+	histogram = np.zeros([sizeH, sizeW, nBins])
+	halfWinSize = int(floor(windowSize / 2.0))
+
+	# for each pixel, generate a 256-bin histogram
 	for i in range(0, depImage.shape[0]): # top/bottom
 		for j in range(0, rgbImage.shape[1]): # left/right
 			# get subsampled image using windowSize
@@ -37,19 +39,31 @@ def generate_joint_histogram(rgbImage, depImage, windowSize, sigmaR, sigmaS, sig
 			leftBound = j - halfWinSize
 			rightBound = j + halfWinSize
 
-			# mask is a tuple for array slicing
-			mask = ([upBound, downBound],[leftBound, rightBound])
+			# edge case handling
 			if(upBound < 0):
-				mask[0][0] = 0
+				upBound = 0
 			if(downBound >= sizeH):
-				mask[0][1] = sizeH - 1
+				downBound = sizeH - 1
 			if(leftBound < 0):
-				mask[1][0] = 0
+				leftBound = 0
 			if(rightBound >= sizeW):
-				mask[1][1] = sizeW - 1
+				rightBound = sizeW - 1
 
-			rgbNeighborhood = rgbImage[mask[0][0]:mask[0][1], mask[1][0]:mask[1][1]]
-			depNeighborhood = depImage[mask[0][0]:mask[0][1], mask[1][0]:mask[1][1]]
+			# neighborhood slicing
+			depNeighborhood = depImage[upBound:downBound, leftBound:rightBound]
+			rgbNeighborhood = rgbImage[upBound:downBound, leftBound:rightBound, :]
+
+			# loop over each neighborhood pixel, put in bin
+			# there has got to be a better way to do this
+			for k in range(0, nBins):
+				for m in range(0, depNeighborhood.shape[0]):
+					for n in range(0, depNeighborhood.shape[1]):
+						colorDiff = sum(abs(rgbImage[i,j,:] - rgbNeighborhood[m,n,:]))
+						histogram[i,j,k] += (gaussian(sigmaS, distance([i,j], [m,n])) * 
+										gaussian(sigmaR, k - depNeighborhood[m,n]) * 
+										gaussian(sigmaI, colorDiff)
+
+
 
 
 	t1 = time.time()
@@ -63,11 +77,12 @@ def loadImages(rgbFilename, depthFilename):
 		sys.exit()
 
 
-	cv2.imshow("test",rgb[:,:,:])
-	cv2.waitKey(0)
+	#cv2.imshow("test",rgb[:,:,:])
+	#cv2.waitKey(0)
 	# convert to CIELAB space
-	lab = cv2.cvtColor(rgb, cv2.CV_BGR2Lab)
-
+	# lab = cv2.cvtColor(rgb, cv2.CV_BGR2Lab)
+	return (rgb, depth)
 
 if __name__ == '__main__':
-	loadImages(sys.argv[1], sys.argv[2])
+	(rgb, dep) = loadImages(sys.argv[1], sys.argv[2])
+	generate_joint_histogram(rgb, dep, 7, 0,0,0,256)
