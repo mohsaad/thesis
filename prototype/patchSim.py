@@ -9,14 +9,14 @@ import sys
 from math import floor
 import time
 
-def gaussianI(sigma, value):
-	pass
+def gaussian(sigma, value):
+	return 0
 
 '''
 Euclidean distance. Used for calculating the spatial Gaussian parameter.
 '''
 def distance(p1, p2):
-	pass
+	return 0
 
 '''
 Assuming RGB and depth images are the same size, calculate the joint histogram
@@ -25,7 +25,7 @@ def generate_joint_histogram(rgbImage, depImage, windowSize, sigmaR, sigmaS, sig
 	sizeH = rgbImage.shape[0]
 	sizeW = rgbImage.shape[1]
 	t0 = time.time()
-	histogram = np.zeros([sizeH, sizeW, nBins])
+	histogram = np.zeros([nBins])
 	halfWinSize = int(floor(windowSize / 2.0))
 
 	# for each pixel, generate a 256-bin histogram
@@ -53,15 +53,18 @@ def generate_joint_histogram(rgbImage, depImage, windowSize, sigmaR, sigmaS, sig
 			depNeighborhood = depImage[upBound:downBound, leftBound:rightBound]
 			rgbNeighborhood = rgbImage[upBound:downBound, leftBound:rightBound, :]
 
-			# loop over each neighborhood pixel, put in bin
-			# there has got to be a better way to do this
-			for k in range(0, nBins):
-				for m in range(0, depNeighborhood.shape[0]):
-					for n in range(0, depNeighborhood.shape[1]):
-						colorDiff = sum(abs(rgbImage[i,j,:] - rgbNeighborhood[m,n,:]))
-						histogram[i,j,k] += (gaussian(sigmaS, distance([i,j], [m,n])) * 
-										gaussian(sigmaR, k - depNeighborhood[m,n]) * 
-										gaussian(sigmaI, colorDiff)
+			colorDiff = rgbImage[i,j,:] - rgbImage
+
+			# # loop over each neighborhood pixel, put in bin
+			# # there has got to be a better way to do this
+			# for k in range(0, nBins):
+			# 	for m in range(0, depNeighborhood.shape[0]):
+			# 		for n in range(0, depNeighborhood.shape[1]):
+			# 			colorDiff = sum(abs(rgbImage[i,j,:] - rgbNeighborhood[m,n,:]))
+			# 			histogram[i,j,k] += (gaussian(sigmaS, distance([i,j], [m,n])) * 
+			# 							gaussian(sigmaR, k - depNeighborhood[m,n]) * 
+			# 							gaussian(sigmaI, colorDiff))
+			# 			print('{0},{1},{2},{3},{4}'.format(i,j,k,m,n))
 
 
 
