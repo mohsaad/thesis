@@ -10,7 +10,7 @@ from math import floor
 import time
 
 def gaussian(sigma, value):
-	return 0
+	return np.random.multivariate
 
 '''
 Euclidean distance. Used for calculating the spatial Gaussian parameter.
@@ -25,8 +25,13 @@ def generate_joint_histogram(rgbImage, depImage, windowSize, sigmaR, sigmaS, sig
 	sizeH = rgbImage.shape[0]
 	sizeW = rgbImage.shape[1]
 	t0 = time.time()
-	histogram = np.zeros([nBins])
+	histogram = np.zeros([sizeH, sizeW, nBins])
 	halfWinSize = int(floor(windowSize / 2.0))
+
+
+
+	# compute distances 
+
 
 	# for each pixel, generate a 256-bin histogram
 	for i in range(0, depImage.shape[0]): # top/bottom
@@ -53,18 +58,12 @@ def generate_joint_histogram(rgbImage, depImage, windowSize, sigmaR, sigmaS, sig
 			depNeighborhood = depImage[upBound:downBound, leftBound:rightBound]
 			rgbNeighborhood = rgbImage[upBound:downBound, leftBound:rightBound, :]
 
-			colorDiff = rgbImage[i,j,:] - rgbImage
 
-			# # loop over each neighborhood pixel, put in bin
-			# # there has got to be a better way to do this
-			# for k in range(0, nBins):
-			# 	for m in range(0, depNeighborhood.shape[0]):
-			# 		for n in range(0, depNeighborhood.shape[1]):
-			# 			colorDiff = sum(abs(rgbImage[i,j,:] - rgbNeighborhood[m,n,:]))
-			# 			histogram[i,j,k] += (gaussian(sigmaS, distance([i,j], [m,n])) * 
-			# 							gaussian(sigmaR, k - depNeighborhood[m,n]) * 
-			# 							gaussian(sigmaI, colorDiff))
-			# 			print('{0},{1},{2},{3},{4}'.format(i,j,k,m,n))
+
+			# numpy-ized
+			colorDiff = np.abs(np.subtract(rgbImage[i,j,:], rgbNeighborhood[:,:,:]))
+			spatialFiltered = gaussian_filter(colorDiff, sigmaS)
+
 
 
 
@@ -114,12 +113,12 @@ def loadImages(rgbFilename, depthFilename):
 	return (rgb, depth)
 
 if __name__ == '__main__':
-	# (rgb, dep) = loadImages(sys.argv[1], sys.argv[2])
-	# generate_joint_histogram(rgb, dep, 7, 0,0,0,256)
+	(rgb, dep) = loadImages(sys.argv[1], sys.argv[2])
+	generate_joint_histogram(rgb, dep, 5, 0,0,0,256)
 
-	depImgs = loadDepImages('testOptFlow.txt', 3)
+	# depImgs = loadDepImages('testOptFlow.txt', 3)
 
-	calcOpticalFlowVectors(depImgs[0], depImgs[1])
+	# calcOpticalFlowVectors(depImgs[0], depImgs[1])
 
 
 
