@@ -37,6 +37,7 @@ def distance(p1, p2):
 
 '''
 Assuming RGB and depth images are the same size, calculate the joint histogram
+APPARENTLY NOT NEEDED, RIP MY TIME
 '''
 def generate_joint_histogram(rgbImage, depImage, windowSize, sigmaR, sigmaS, sigmaI, nBins):
 	sizeH = rgbImage.shape[0]
@@ -82,7 +83,7 @@ def generate_joint_histogram(rgbImage, depImage, windowSize, sigmaR, sigmaS, sig
 
 			# numpy-ized
 			colorDiff = np.sum(np.abs(np.subtract(rgbImage[i,j,:], rgbNeighborhood[:,:,:])), axis = 2)
-			guideFiltered = fftconvolve(guideFilter, colorDiff)
+		
 
 
 
@@ -92,6 +93,9 @@ def generate_joint_histogram(rgbImage, depImage, windowSize, sigmaR, sigmaS, sig
 
 	t1 = time.time()
 	print(t1 - t0)
+
+
+
 
 
 '''
