@@ -8,9 +8,26 @@ import cv2
 import sys
 from math import floor
 import time
+from scipy import ndimage
+from scipy.signal import fftconvolve
 
-def gaussian(sigma, value):
-	return np.random.multivariate
+'''
+Taken from here: http://stackoverflow.com/questions/17190649/how-to-obtain-a-gaussian-filter-in-python
+'''
+def matlab_style_gauss2D(shape=(3,3),sigma=0.5):
+    """
+    2D gaussian mask - should give the same result as MATLAB's
+    fspecial('gaussian',[shape],[sigma])
+    """
+    m,n = [(ss-1.)/2. for ss in shape]
+    y,x = np.ogrid[-m:m+1,-n:n+1]
+    h = np.exp( -(x*x + y*y) / (2.*sigma*sigma) )
+    h[ h < np.finfo(h.dtype).eps*h.max() ] = 0
+    sumh = h.sum()
+    if sumh != 0:
+        h /= sumh
+    return h
+	
 
 '''
 Euclidean distance. Used for calculating the spatial Gaussian parameter.
@@ -28,8 +45,11 @@ def generate_joint_histogram(rgbImage, depImage, windowSize, sigmaR, sigmaS, sig
 	histogram = np.zeros([sizeH, sizeW, nBins])
 	halfWinSize = int(floor(windowSize / 2.0))
 
-
-
+	t1 = time.time()
+	spatialFilter = matlab_style_gauss2D(shape = (windowSize, windowSize), sigma = sigmaS)
+	guideFilter = matlab_style_gauss2D(shape = (windowSize, windowSize), sigma = sigmaI)
+	relaxationFilter = matlab_style_gauss2D(shape = (windowSize, windowSize), sigma = sigmaR)
+	print('Initialization time: {0} s'.format(time.time() - t0))
 	# compute distances 
 
 
@@ -61,8 +81,10 @@ def generate_joint_histogram(rgbImage, depImage, windowSize, sigmaR, sigmaS, sig
 
 
 			# numpy-ized
-			colorDiff = np.abs(np.subtract(rgbImage[i,j,:], rgbNeighborhood[:,:,:]))
-			spatialFiltered = gaussian_filter(colorDiff, sigmaS)
+			colorDiff = np.sum(np.abs(np.subtract(rgbImage[i,j,:], rgbNeighborhood[:,:,:])), axis = 2)
+			guideFiltered = fftconvolve(guideFilter, colorDiff)
+
+
 
 
 
@@ -114,7 +136,7 @@ def loadImages(rgbFilename, depthFilename):
 
 if __name__ == '__main__':
 	(rgb, dep) = loadImages(sys.argv[1], sys.argv[2])
-	generate_joint_histogram(rgb, dep, 5, 0,0,0,256)
+	generate_joint_histogram(rgb, dep, 5, 1,1,1,256)
 
 	# depImgs = loadDepImages('testOptFlow.txt', 3)
 
