@@ -78,12 +78,10 @@ Calculates optical flow. Images should be ordered.
 '''
 def calcOpticalFlowVectors(depImage1, depImage2):
 	t0 = time.time()
-	print('test1')
 	flow = cv2.calcOpticalFlowFarneback(depImage1, depImage2, None, 0.5, 3, 15, 3, 5, 1.2, 0)
-	print('test2')
 	t1 = time.time()
 	print(t1 - t0)
-	print(type(flow))
+	print(flow.shape)
 
 '''
 Loads a bunch of depth images
@@ -96,8 +94,8 @@ def loadDepImages(depFileName, numImages):
 			print(count)
 			if count > numImages:
 				break
-			cv2.imread(line.split('\n')[0], cv2.IMREAD_GRAYSCALE)
-
+			imgs.append(cv2.imread(line.split('\n')[0], cv2.IMREAD_GRAYSCALE))
+			count += 1
 	return imgs
 
 def loadImages(rgbFilename, depthFilename):
@@ -119,7 +117,8 @@ if __name__ == '__main__':
 	# (rgb, dep) = loadImages(sys.argv[1], sys.argv[2])
 	# generate_joint_histogram(rgb, dep, 7, 0,0,0,256)
 
-	depImgs = loadDepImages('depthFilenames.txt', 10)
+	depImgs = loadDepImages('testOptFlow.txt', 3)
+
 	calcOpticalFlowVectors(depImgs[0], depImgs[1])
 
 
