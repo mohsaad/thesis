@@ -18,6 +18,11 @@ def calcOpticalFlowVectors(depImage1, depImage2):
 	t1 = time.time()
 	return flow
 
+def filterWithGuide(depImage0, rgbImage0, sigma, epsilon):
+	guidedFilt = FastGuidedFilter(dep0, radius = sigma, epsilon = epsilon)
+	
+
+
 count = 0
 with open(sys.argv[1], 'r') as f:
 	for line in f:
