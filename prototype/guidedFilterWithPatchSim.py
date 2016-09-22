@@ -21,8 +21,13 @@ class TemporalFilter:
 				self.rgbImages.append(cv2.imread(f.readline()))
 			for i in range(0, int(f.readline()))
 				self.depImages.append(cv2.imread(f.readline()))
-	
 
+
+	def getDepImages(self):
+		return self.depImages
+
+	def getRGBImages(self):
+		return self.rgbImages
 
 	def filter_with_rgb_guide(self, rgb, dep):
 		t1 = time.time()
@@ -81,11 +86,9 @@ class TemporalFilter:
 
 
 def main():
-	prevFrame = sys.argv[1]
-	curFrame = sys.argv[2]
-	nextFrame = sys.argv[3]
+	imgList = sys.argv[1]
 
-	tf = TemporalFilter(prevFrame, curFrame, nextFrame)
+	tf = TemporalFilter(imgList)
 	tf
 
 
