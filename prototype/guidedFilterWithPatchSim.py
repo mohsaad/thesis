@@ -22,7 +22,7 @@ class TemporalFilter:
 			for i in range(0, int(f.readline())):
 				self.depImages.append(cv2.imread(f.readline().split("\n")[0], cv2.IMREAD_GRAYSCALE))
 
-
+		
 
 	def getDepImages(self):
 		return self.depImages
@@ -35,23 +35,60 @@ class TemporalFilter:
 		t1 = time.time()
 		guide = GuidedFilter(rgb, radius = 1, epsilon = 0.01)
 		out = guide.filter(dep)
-		print(time.time() - t1)
 		return out
 
 
-	def calculateOptFlow(self, img0, img1, winSize, maxLevel):
+	def calculateOptFlow(self, img0, img1):
 		feature_params = dict( maxCorners = 100,
                            	qualityLevel = 0.3,
-                           	minDistance = 7,
+                           	minDistance = 3,
                            	blockSize = 7 )
-   
-		 lk_params = dict( winSize  = (15,15), maxLevel = 2,
+
+		testImg0 = np.multiply(img0, 255).astype(np.uint8)
+		testImg1 = np.multiply(img1, 255).astype(np.uint8)
+
+   		lk_params = dict(winSize  = (15, 15), maxLevel = 2,
 		                criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 
-		 p0 = cv2.goodFeaturesToTrack(img0, mask = None, **feature_params)
+		p0 = cv2.goodFeaturesToTrack(testImg0, mask = None, **feature_params)
+
+		p1, st, err = cv2.calcOpticalFlowPyrLK(testImg0, testImg1, p0, None, **lk_params)
+
+		pixel0 = p0[st == 1][0]
+		pixel1 = p1[st == 1][0]
+
+		print(pixel0, pixel1, st)
+		return (p0, p1, st)
 
 
-	def patchSimilarity(self, depImage0, depImage1, sigmaR, maskRadius):		
+	def getImgMask(self, img, pixel, winSize):
+		# gets an image mask 
+		
+
+		halfWinSize = math.floor(maskRadius/2)
+		sizeW, sizeH = depImage0.shape
+
+		# get each indices to minimize comparisons
+		upBound = pixel[0] - halfWinSize
+		downBound = pixel[0] + halfWinSize
+		leftBound = pixel[1] - halfWinSize
+		rightBound = pixel[1] + halfWinSize
+
+		# edge case handling
+		if(upBound < 0):
+			upBound = 0
+		if(downBound >= sizeH):
+			downBound = sizeH - 1
+		if(leftBound < 0):
+			leftBound = 0
+		if(rightBound >= sizeW):
+			rightBound = sizeW - 1
+
+			# neighborhood slicing
+		neighborhood = img[upBound:downBound, leftBound:rightBound]
+		return neighborhood		
+
+	def patchSimilarity(self, depImage0, depImage1, img0Feats, img1Feats, st, sigmaR, maskRadius):		
 		# so we need to loop over each pixel and compute a mask difference
 		# to give us a weighing between each pixel
 		# apparently we only need 1 optical flow vector -> but from where?
@@ -62,12 +99,11 @@ class TemporalFilter:
 		# so we use a single patch to compute the total weighting - how to determine patch?
 		# use cv2.goodFeaturesToTrack and compute like 4-5 of them to determine weighting
 		
-		print(flow[1][1])
+		# use single pixel for now, maybe more later?
+		# pixel0 = img0Fea
 
-		halfWinSize = math.floor(maskRadius/2)
-		sizeW, sizeH = depImage0.shape
-
-
+		oldMask = self.getImgMask(depImage0, img0Feats, maskRadius)
+		newMask = self.getImgMask(depImage1, img1Feats, maskRadius)
 
 
 		cv2.imshow('depImage1', depImage1)
@@ -84,9 +120,10 @@ def main():
 	dep = tf.getDepImages()
 	new_out_1 = tf.filter_with_rgb_guide(rgb[1], dep[1])
 	new_out_0 = tf.filter_with_rgb_guide(rgb[0], dep[0])
-	print(new_out_0.shape, new_out_1.shape)
+	tf.calculateOptFlow(new_out_0, new_out_1)
 
-	tf.patchSimilarity(new_out_0, new_out_1, 5, 40)
+
+	# tf.patchSimilarity(new_out_0, new_out_1, 5, 40)
 
 if __name__ == '__main__':
 	main()
