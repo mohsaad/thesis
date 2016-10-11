@@ -57,22 +57,29 @@ class TemporalFilter:
 		pixel0 = p0[st == 1][0]
 		pixel1 = p1[st == 1][0]
 
-		print(pixel0, pixel1, st)
-		return (p0, p1, st)
+		# convert to scalar so we can access array
+		for i in range(0, len(pixel1)):
+			pixel1[i] = math.floor(pixel1[i])
+
+		return (pixel0, pixel1, st)
 
 
 	def getImgMask(self, img, pixel, winSize):
 		# gets an image mask 
 		
 
-		halfWinSize = math.floor(maskRadius/2)
-		sizeW, sizeH = depImage0.shape
+		halfWinSize = math.floor(winSize/2)
+		sizeW, sizeH = img.shape
+
+		print(pixel)
 
 		# get each indices to minimize comparisons
 		upBound = pixel[0] - halfWinSize
 		downBound = pixel[0] + halfWinSize
 		leftBound = pixel[1] - halfWinSize
 		rightBound = pixel[1] + halfWinSize
+
+
 
 		# edge case handling
 		if(upBound < 0):
@@ -88,7 +95,7 @@ class TemporalFilter:
 		neighborhood = img[upBound:downBound, leftBound:rightBound]
 		return neighborhood		
 
-	def patchSimilarity(self, depImage0, depImage1, img0Feats, img1Feats, st, sigmaR, maskRadius):		
+	def patchSimilarity(self, depImage0, depImage1, img0Feats, img1Feats, st, sigmaP, winSize):		
 		# so we need to loop over each pixel and compute a mask difference
 		# to give us a weighing between each pixel
 		# apparently we only need 1 optical flow vector -> but from where?
@@ -100,15 +107,16 @@ class TemporalFilter:
 		# use cv2.goodFeaturesToTrack and compute like 4-5 of them to determine weighting
 		
 		# use single pixel for now, maybe more later?
-		# pixel0 = img0Fea
+		
 
-		oldMask = self.getImgMask(depImage0, img0Feats, maskRadius)
-		newMask = self.getImgMask(depImage1, img1Feats, maskRadius)
+		oldMask = self.getImgMask(depImage0, img0Feats, winSize)
+		newMask = self.getImgMask(depImage1, img1Feats, winSize)
 
+		weight = np.exp(-1*np.sum(np.abs(np.subtract(oldMask, newMask))/sigmaP))
 
-		cv2.imshow('depImage1', depImage1)
-		cv2.waitKey(0)
-		return depImage1
+		print(weight)
+
+		# return depImage1
 
 
 
@@ -120,10 +128,9 @@ def main():
 	dep = tf.getDepImages()
 	new_out_1 = tf.filter_with_rgb_guide(rgb[1], dep[1])
 	new_out_0 = tf.filter_with_rgb_guide(rgb[0], dep[0])
-	tf.calculateOptFlow(new_out_0, new_out_1)
+	(p0, p1, st) = tf.calculateOptFlow(new_out_0, new_out_1)
 
-
-	# tf.patchSimilarity(new_out_0, new_out_1, 5, 40)
+	tf.patchSimilarity(new_out_0, new_out_1, p0, p1, st, 40, 5)
 
 if __name__ == '__main__':
 	main()
