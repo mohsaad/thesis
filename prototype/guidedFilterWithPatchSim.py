@@ -52,7 +52,10 @@ class TemporalFilter:
 
 		p0 = cv2.goodFeaturesToTrack(testImg0, mask = None, **feature_params)
 
+
 		p1, st, err = cv2.calcOpticalFlowPyrLK(testImg0, testImg1, p0, None, **lk_params)
+
+
 
 		pixel0 = p0[st == 1][0]
 		pixel1 = p1[st == 1][0]
@@ -71,13 +74,13 @@ class TemporalFilter:
 		halfWinSize = math.floor(winSize/2)
 		sizeW, sizeH = img.shape
 
-		print(pixel)
+
 
 		# get each indices to minimize comparisons
-		upBound = pixel[0] - halfWinSize
-		downBound = pixel[0] + halfWinSize
-		leftBound = pixel[1] - halfWinSize
-		rightBound = pixel[1] + halfWinSize
+		upBound = int(pixel[0] - halfWinSize)
+		downBound = int(pixel[0] + halfWinSize)
+		leftBound = int(pixel[1] - halfWinSize)
+		rightBound = int(pixel[1] + halfWinSize)
 
 
 
@@ -91,33 +94,50 @@ class TemporalFilter:
 		if(rightBound >= sizeW):
 			rightBound = sizeW - 1
 
+		# upBound = max(upBound,0)
+		# downBound = min(downBound, sizeH - 1)
+
 			# neighborhood slicing
 		neighborhood = img[upBound:downBound, leftBound:rightBound]
 		return neighborhood		
 
-	def patchSimilarity(self, depImage0, depImage1, img0Feats, img1Feats, st, sigmaP, winSize):		
+	def patchSimilarity(self, depImage0, depImage1, sigmaP, winSize):		
 		# so we need to loop over each pixel and compute a mask difference
 		# to give us a weighing between each pixel
 		# apparently we only need 1 optical flow vector -> but from where?
 
-		# first we calculate each optical flow vector to see which pixel went where
-		# this is a nonlocal video denoising - we do a bunch of patches to see where each
-		# individual patch went
 		# so we use a single patch to compute the total weighting - how to determine patch?
 		# use cv2.goodFeaturesToTrack and compute like 4-5 of them to determine weighting
 		
 		# use single pixel for now, maybe more later?
 		
+		(img0Feats, img1Feats, st) = self.calculateOptFlow(depImage0, depImage1)
+
 
 		oldMask = self.getImgMask(depImage0, img0Feats, winSize)
 		newMask = self.getImgMask(depImage1, img1Feats, winSize)
 
 		weight = np.exp(-1*np.sum(np.abs(np.subtract(oldMask, newMask))/sigmaP))
 
-		print(weight)
+		return weight
 
-		# return depImage1
+	def calculateTotalPatchSimilarity(self, prevDepImgs, depImg):
+		weights = []
+		for i in range(0, len(prevDepImgs)):
+			weights.append(self.patchSimilarity(prevDepImgs[i], depImg, 40, 5))
 
+		# just to make sure, let's also calculate the weight for the current image (although)
+		# I think it'll be way too high
+		# weights.append(self.patchSimilarity(depImg, depImg, 40, 5))
+		# print(weights)
+
+		# normalize weights
+		for i in range(0, len(prevDepImgs)):
+			weights[i] /= sum(weights)
+
+		# now, reconstruct our depth map
+
+		print(weights)
 
 
 
@@ -126,11 +146,15 @@ def main():
 	tf = TemporalFilter(imgList)
 	rgb = tf.getRGBImages()
 	dep = tf.getDepImages()
-	new_out_1 = tf.filter_with_rgb_guide(rgb[1], dep[1])
-	new_out_0 = tf.filter_with_rgb_guide(rgb[0], dep[0])
-	(p0, p1, st) = tf.calculateOptFlow(new_out_0, new_out_1)
 
-	tf.patchSimilarity(new_out_0, new_out_1, p0, p1, st, 40, 5)
+	# filter with a guide
+	for i in range(0, len(dep)):
+		dep[i] = tf.filter_with_rgb_guide(rgb[i], dep[i])
+
+	tf.calculateTotalPatchSimilarity(dep, dep[-1])
+
+
+
 
 if __name__ == '__main__':
 	main()
