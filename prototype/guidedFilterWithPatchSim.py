@@ -138,6 +138,7 @@ class TemporalFilter:
 		# now, reconstruct our depth map
 
 		print(weights)
+		return weights
 
 
 
@@ -151,7 +152,17 @@ def main():
 	for i in range(0, len(dep)):
 		dep[i] = tf.filter_with_rgb_guide(rgb[i], dep[i])
 
-	tf.calculateTotalPatchSimilarity(dep, dep[-1])
+	weights = tf.calculateTotalPatchSimilarity(dep, dep[-1])
+
+
+
+	outImg = np.zeros(dep[0].shape)
+	for i in range(0, len(weights)):
+		outImg += dep[i] * weights[i]
+
+	cv2.imshow("test", outImg)
+	cv2.waitKey(0)
+
 
 
 
