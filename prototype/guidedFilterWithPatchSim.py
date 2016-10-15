@@ -33,8 +33,10 @@ class TemporalFilter:
 	def filter_with_rgb_guide(self, rgb, dep):
 		
 		t1 = time.time()
-		guide = GuidedFilter(rgb, radius = 1, epsilon = 0.01)
-		out = guide.filter(dep)
+		dep = cv2.resize(dep, (rgb.shape[0], rgb.shape[1]))
+		guide = GuidedFilter(rgb, radius = 2, epsilon = 1e-3)
+		out = guide.filter(dep) * 1
+		print time.time() - t1
 		return out
 
 
@@ -140,28 +142,41 @@ class TemporalFilter:
 		print(weights)
 		return weights
 
+	def addNoise(self, depImgs):
+		for i in range(0, len(depImgs)):
+			noise = np.random.normal(0, 10, (depImgs[0].shape[0], depImgs[0].shape[1])).astype('uint8')
+			# depImgs[i] = cv2.resize(depImgs[i], (depImgs[i].shape[0]/4, depImgs[i].shape[1] / 4))
+			depImgs[i] += noise
 
+		return depImgs
+			
 
 def main():
 	imgList = sys.argv[1]
 	tf = TemporalFilter(imgList)
 	rgb = tf.getRGBImages()
 	dep = tf.getDepImages()
+	noise = tf.addNoise(dep)
+	oldDep = tf.getDepImages()
+
 
 	# filter with a guide
 	for i in range(0, len(dep)):
-		dep[i] = tf.filter_with_rgb_guide(rgb[i], dep[i])
+		dep[i] = tf.filter_with_rgb_guide(rgb[i], noise[i])
+		cv2.imshow("depth", dep[i])
+		cv2.waitKey(0)
 
-	weights = tf.calculateTotalPatchSimilarity(dep, dep[-1])
+
+	# weights = tf.calculateTotalPatchSimilarity(dep, dep[-1])
 
 
 
-	outImg = np.zeros(dep[0].shape)
-	for i in range(0, len(weights)):
-		outImg += dep[i] * weights[i]
+	# outImg = np.zeros(dep[0].shape)
+	# for i in range(0, len(weights)):
+	# 	outImg += dep[i] * weights[i]
 
-	cv2.imshow("test", outImg)
-	cv2.waitKey(0)
+	# cv2.imshow("test", outImg)
+	# cv2.waitKey(0)
 
 
 
