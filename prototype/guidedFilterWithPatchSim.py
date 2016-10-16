@@ -33,10 +33,9 @@ class TemporalFilter:
 	def filter_with_rgb_guide(self, rgb, dep):
 		
 		t1 = time.time()
-		dep = cv2.resize(dep, (rgb.shape[0], rgb.shape[1]))
+		dep = cv2.resize(dep, (rgb.shape[1], rgb.shape[0]))
 		guide = GuidedFilter(rgb, radius = 2, epsilon = 1e-3)
 		out = guide.filter(dep) * 1
-		print time.time() - t1
 		return out
 
 
@@ -46,8 +45,11 @@ class TemporalFilter:
                            	minDistance = 3,
                            	blockSize = 7 )
 
-		testImg0 = np.multiply(img0, 255).astype(np.uint8)
-		testImg1 = np.multiply(img1, 255).astype(np.uint8)
+		testImg0 = cv2.cvtColor(img0, cv2.COLOR_BGR2GRAY)
+		testImg1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+
+		# testImg0 = np.multiply(img0, 255).astype(np.uint8)
+		# testImg1 = np.multiply(img1, 255).astype(np.uint8)
 
    		lk_params = dict(winSize  = (15, 15), maxLevel = 2,
 		                criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
@@ -59,8 +61,8 @@ class TemporalFilter:
 
 
 
-		pixel0 = p0[st == 1][0]
-		pixel1 = p1[st == 1][0]
+		pixel0 = p0[st == 1][1]
+		pixel1 = p1[st == 1][1]
 
 		# convert to scalar so we can access array
 		for i in range(0, len(pixel1)):
@@ -103,7 +105,7 @@ class TemporalFilter:
 		neighborhood = img[upBound:downBound, leftBound:rightBound]
 		return neighborhood		
 
-	def patchSimilarity(self, depImage0, depImage1, sigmaP, winSize):		
+	def patchSimilarity(self, depImage0, depImage1, rgb0, rgb1, sigmaP, winSize):		
 		# so we need to loop over each pixel and compute a mask difference
 		# to give us a weighing between each pixel
 		# apparently we only need 1 optical flow vector -> but from where?
@@ -113,40 +115,54 @@ class TemporalFilter:
 		
 		# use single pixel for now, maybe more later?
 		
-		(img0Feats, img1Feats, st) = self.calculateOptFlow(depImage0, depImage1)
+		(img0Feats, img1Feats, st) = self.calculateOptFlow(rgb0, rgb1)
 
 
 		oldMask = self.getImgMask(depImage0, img0Feats, winSize)
 		newMask = self.getImgMask(depImage1, img1Feats, winSize)
 
+		if(oldMask.shape != newMask.shape):
+			return 0
+
 		weight = np.exp(-1*np.sum(np.abs(np.subtract(oldMask, newMask))/sigmaP))
 
 		return weight
 
-	def calculateTotalPatchSimilarity(self, prevDepImgs, depImg):
+	def calculateTotalPatchSimilarity(self, dep, rgb, sigmaP, winSize):
 		weights = []
-		for i in range(0, len(prevDepImgs)):
-			weights.append(self.patchSimilarity(prevDepImgs[i], depImg, 40, 5))
+		out_dep = []
 
-		# just to make sure, let's also calculate the weight for the current image (although)
-		# I think it'll be way too high
-		# weights.append(self.patchSimilarity(depImg, depImg, 40, 5))
-		# print(weights)
+		# so we're going to use the method implemented in Minh's paper
+		# Which is to calculate the weight for t-1 frame and the t+1 frame
+		# first one has no improvement
+		out_dep.append(dep[0])
+		for i in range(1, len(dep) - 1):
+			# get weight of t-1 frame
+			prevWeight = self.patchSimilarity(dep[i-1],dep[i],rgb[i-1],rgb[i], sigmaP, winSize)
+			# get weight of t+1 frame
+			nextWeight = self.patchSimilarity(dep[i],dep[i+1],rgb[i],rgb[i+1], sigmaP, winSize)
 
-		# normalize weights
-		for i in range(0, len(prevDepImgs)):
-			weights[i] /= sum(weights)
+			# get weight of current frame
+			currWeight = self.patchSimilarity(dep[i], dep[i], rgb[i], rgb[i], sigmaP, winSize)
 
-		# now, reconstruct our depth map
+			total_weight = [prevWeight, currWeight, nextWeight]
 
-		print(weights)
-		return weights
+			for j in range(0, len(total_weight)):
+				total_weight[j] /= float(sum(total_weight))
+
+
+			# in the paper, the current frame has a weight equivalent to the 
+			dep[i] = (0.25 * dep[i-i] + 0.5 * dep[i] + 0.25 * dep[i + 1])
+
+		# out_dep[len(dep) - 1].append(dep[-1])
+		return dep
 
 	def addNoise(self, depImgs):
 		for i in range(0, len(depImgs)):
 			noise = np.random.normal(0, 10, (depImgs[0].shape[0], depImgs[0].shape[1])).astype('uint8')
 			# depImgs[i] = cv2.resize(depImgs[i], (depImgs[i].shape[0]/4, depImgs[i].shape[1] / 4))
 			depImgs[i] += noise
+			cv2.imwrite("../noise_imgs/depNoise{0}.png".format(i), depImgs[i])
 
 		return depImgs
 			
@@ -163,20 +179,15 @@ def main():
 	# filter with a guide
 	for i in range(0, len(dep)):
 		dep[i] = tf.filter_with_rgb_guide(rgb[i], noise[i])
-		cv2.imshow("depth", dep[i])
+		# cv2.imshow("depth", dep[i])
+		# cv2.waitKey(0)
+
+
+	patchSim = tf.calculateTotalPatchSimilarity(dep, rgb, 40, 4)
+
+	for i in range(0, len(patchSim)):
+		cv2.imshow("test", patchSim[i])
 		cv2.waitKey(0)
-
-
-	# weights = tf.calculateTotalPatchSimilarity(dep, dep[-1])
-
-
-
-	# outImg = np.zeros(dep[0].shape)
-	# for i in range(0, len(weights)):
-	# 	outImg += dep[i] * weights[i]
-
-	# cv2.imshow("test", outImg)
-	# cv2.waitKey(0)
 
 
 
