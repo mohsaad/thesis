@@ -22,7 +22,7 @@ class TemporalFilter:
 			for i in range(0, int(f.readline())):
 				self.depImages.append(cv2.imread(f.readline().split("\n")[0], cv2.IMREAD_GRAYSCALE))
 
-		
+		 
 
 	def getDepImages(self):
 		return self.depImages
@@ -61,8 +61,10 @@ class TemporalFilter:
 
 
 
-		pixel0 = p0[st == 1][1]
-		pixel1 = p1[st == 1][1]
+		pixel0 = p0[st == 1][0]
+		pixel1 = p1[st == 1][0]
+
+
 
 		# convert to scalar so we can access array
 		for i in range(0, len(pixel1)):
@@ -137,25 +139,57 @@ class TemporalFilter:
 		# first one has no improvement
 		out_dep.append(dep[0])
 		for i in range(1, len(dep) - 1):
+
+
 			# get weight of t-1 frame
 			prevWeight = self.patchSimilarity(dep[i-1],dep[i],rgb[i-1],rgb[i], sigmaP, winSize)
 			# get weight of t+1 frame
 			nextWeight = self.patchSimilarity(dep[i],dep[i+1],rgb[i],rgb[i+1], sigmaP, winSize)
 
-			# get weight of current frame
-			currWeight = self.patchSimilarity(dep[i], dep[i], rgb[i], rgb[i], sigmaP, winSize)
+			currWeight = 1
 
 			total_weight = [prevWeight, currWeight, nextWeight]
 
-			for j in range(0, len(total_weight)):
-				total_weight[j] /= float(sum(total_weight))
+
+			new_weight = np.zeros(3)
+			for j in range(0, len(new_weight)):
+				new_weight[j] = total_weight[j] / sum(total_weight)
 
 
-			# in the paper, the current frame has a weight equivalent to the 
-			dep[i] = (0.25 * dep[i-i] + 0.5 * dep[i] + 0.25 * dep[i + 1])
 
-		# out_dep[len(dep) - 1].append(dep[-1])
+			dep[i] = new_weight[0] * dep[i-1] + new_weight[1] * dep[i] + new_weight[2] * dep[i+1]
+
+
+
 		return dep
+
+
+	def calculate_weight(self, pixel0, pixel1):
+		oldMask = self.getImgMask(dep[i])
+		newMask = self.getImgMask(depImage1, img1Feats, winSize)
+
+
+		weight = np.exp(-1*np.sum(np.abs(np.subtract(oldMask, newMask))/sigmaP))
+		return weight
+
+
+	def utilize_dense_optical_flow(self, dep, sigmaP, winSize):
+		for i in range(1, len(dep) - 1):
+			flowprev = cv2.calcOpticalFlowFarneback(dep[i-1], dep[i], None, 0.5, 3, 15, 3, 5, 1.2, 0)
+			flownext = cv2.calcOpticalFlowFarneback(dep[i], dep[i+1], None, 0.5, 3, 15, 3, 5, 1.2, 0)
+
+			for i in range(0, dep[i].shape[0]):
+				for j in range(0, dep[i].shape[1]):
+
+					oldMask = self.getImgMask(dep[i])
+					newMask = self.getImgMask(depImage1, img1Feats, winSize)
+
+					if(oldMask.shape != newMask.shape):
+						return 0
+
+					weight = np.exp(-1*np.sum(np.abs(np.subtract(oldMask, newMask))/sigmaP))
+
+		
 
 	def addNoise(self, depImgs):
 		for i in range(0, len(depImgs)):
@@ -165,29 +199,70 @@ class TemporalFilter:
 			cv2.imwrite("../noise_imgs/depNoise{0}.png".format(i), depImgs[i])
 
 		return depImgs
-			
+
+
+	# def filter_with_spatio_temporal(self, dep, depAdj, rgb, winSize):
+	# 	t1 = time.time()
+	# 	sizeW, sizeH = dep[0].shape
+		
+
+	# 	center = math.floor(winSize/2)
+
+	# 	# precompute euclidean distance
+
+
+	# 	for a in range(1, len(dep)):
+	# 		for i in range(0, sizeW):
+	# 			for j in range(0, sizeH):
+	# 				depAdjMask = self.getImgMask(depAdj, (i,j), winSize) 
+	# 				rgbMask = self.getImgMask(yuv, (i,j), winSize)
+
+	# 				wc = 0
+	# 				wst = 0
+	# 				wsd = 0
+
+	# 				for k in range(0, depMask.shape[0]):
+	# 					for m in range(0, depMask.shape[1]):
+	# 						wcq = np.exp(-1*((center - k) ** 2 + (center - m) ** 2)/(2*3**2))
+	# 						wstq = np.exp(-1*(rgbMask[k,m] - rgbMask[center,center])**2/(2*0.1**2))
+	# 						wsdq = np.exp(-1*(depMask[k,m] - depMask[center,center])**2/(2*0.1**2))
+
+
+
+
+# calculates error rate
+# def calculateMSE(img1, img2):
+
 
 def main():
 	imgList = sys.argv[1]
 	tf = TemporalFilter(imgList)
 	rgb = tf.getRGBImages()
 	dep = tf.getDepImages()
-	noise = tf.addNoise(dep)
+	# noise = tf.addNoise(dep)
 	oldDep = tf.getDepImages()
 
+	t1 = time.time()
 
 	# filter with a guide
 	for i in range(0, len(dep)):
-		dep[i] = tf.filter_with_rgb_guide(rgb[i], noise[i])
+		dep[i] = tf.filter_with_rgb_guide(rgb[i], dep[i])
 		# cv2.imshow("depth", dep[i])
 		# cv2.waitKey(0)
 
 
+	# tf.utilize_dense_optical_flow(dep, 40, 5)
+
 	patchSim = tf.calculateTotalPatchSimilarity(dep, rgb, 40, 4)
 
-	for i in range(0, len(patchSim)):
-		cv2.imshow("test", patchSim[i])
-		cv2.waitKey(0)
+	print(time.time() - t1)
+
+	for i in range(0, len(dep)):
+		# cv2.imshow("test", oldDep[i])
+		# cv2.imwrite("../results/tanks/result{0}.png".format(i), oldDep[i]*255)
+
+		cv2.imwrite("../results/kinect-nyu/result{0}.png".format(i), oldDep[i]*255)
+		#v2.waitKey(0)
 
 
 
